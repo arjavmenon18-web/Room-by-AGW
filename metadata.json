@@ -1,0 +1,12 @@
+{
+  "name": "ROOM",
+  "description": "A digital space to meet, create, and collaborate by Armen GlobalWorks.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "display-capture"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

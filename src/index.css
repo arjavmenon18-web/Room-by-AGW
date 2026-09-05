@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-serif: 'Instrument Serif', Georgia, serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* ROOM Editorial Color System */
+    --surface-ivory: #faf8f5;
+    --surface-warm-neutral: #f4f0e7;
+    --surface-dark: #151413;
+    --surface-dark-soft: #1d1c1a;
+    --accent-cyan: #148b94;
+    --accent-cyan-subtle: rgba(20, 139, 148, 0.12);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #faf7f2;
+    color: #1a1917;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  body.atmosphere-obsidian {
+    background-color: #141312;
+    color: #eae5dc;
+  }
+
+  body.atmosphere-studio {
+    background-color: #f7f6f3;
+    color: #141312;
+  }
+}
+
+/* Subtle physical paper & film-grain texture */
+.room-grain {
+  background-image: 
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='fineGrain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.14  0 0 0 0 0.13  0 0 0 0 0.11  0 0 0 0.024 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23fineGrain)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paperTooth'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.05' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.2  0 0 0 0 0.18  0 0 0 0 0.15  0 0 0 0.009 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperTooth)'/%3E%3C/svg%3E");
+}
+
+/* Subtle background tonal depth: warm off-white center gently moving to peripheral warm stone */
+.room-surface-depth {
+  background-color: #faf7f2;
+  background-image: 
+    radial-gradient(130% 110% at 50% 18%, #fdfcf9 0%, #faf6ef 45%, #f4efe4 80%, #ebe4d5 100%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='fineGrain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.14  0 0 0 0 0.13  0 0 0 0 0.11  0 0 0 0.024 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23fineGrain)'/%3E%3C/svg%3E");
+}
+
+body.atmosphere-obsidian .room-surface-depth {
+  background-color: #141312;
+  background-image: 
+    radial-gradient(130% 110% at 50% 18%, #1f1d1a 0%, #181715 45%, #141312 80%, #0d0c0b 100%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseDark'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseDark)'/%3E%3C/svg%3E");
+}
+
+body.atmosphere-studio .room-surface-depth {
+  background-color: #f7f6f3;
+  background-image: 
+    radial-gradient(130% 110% at 50% 18%, #ffffff 0%, #faf9f6 45%, #f4f3ef 80%, #eae8e1 100%);
+}
+
+body.no-grain .room-grain,
+body.no-grain .room-surface-depth,
+body.no-grain .room-grain-dark {
+  background-image: none !important;
+}
+
+/* Dark mode room canvas film grain */
+.room-grain-dark {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseDark'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseDark)'/%3E%3C/svg%3E");
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(26, 25, 23, 0.14);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(26, 25, 23, 0.25);
+}
+
+.dark ::-webkit-scrollbar-thumb,
+.room-canvas ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+}
+.dark ::-webkit-scrollbar-thumb:hover,
+.room-canvas ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Quiet active speaker breathing ring */
+@keyframes speakerGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 1.5px rgba(20, 139, 148, 0.65), 0 0 18px rgba(20, 139, 148, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(20, 139, 148, 0.85), 0 0 26px rgba(20, 139, 148, 0.28);
+  }
+}
+
+.active-speaker-ring {
+  animation: speakerGlow 2.4s ease-in-out infinite;
+}

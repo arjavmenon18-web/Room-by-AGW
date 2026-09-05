@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "rooms": {
+      "title": "Room",
+      "description": "Virtual meeting space created in ROOM by Armen GlobalWorks",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique room code e.g. ROOM-ABCDE" },
+        "title": { "type": "string", "description": "Title or agenda summary of the conference" },
+        "createdBy": { "type": "string", "description": "Creator identifier or display name" },
+        "hostId": { "type": "string", "description": "Host user UID or local ID" },
+        "hostName": { "type": "string", "description": "Host display name" },
+        "status": { "type": "string", "description": "Status of the room (active, ended)" },
+        "notes": { "type": "string", "description": "Shared collaborative meeting notes" },
+        "googleMeetUri": { "type": "string", "description": "Synced Google Meet URI" },
+        "googleMeetCode": { "type": "string", "description": "Synced Google Meet space code" },
+        "features": { "type": "object", "description": "Room permissions and toggles" },
+        "agenda": { "type": "array", "description": "Agenda items for the meeting" },
+        "files": { "type": "array", "description": "Shared workspace documents and assets" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title"]
+    },
+    "rooms/messages": {
+      "title": "Message",
+      "description": "Live real-time meeting chat messages",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "reactions": { "type": "array" }
+      },
+      "required": ["senderName", "text", "timestamp"]
+    },
+    "rooms/participants": {
+      "title": "Participant",
+      "description": "Live participant presence in a room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "status": { "type": "string" },
+        "micOn": { "type": "boolean" },
+        "videoOn": { "type": "boolean" },
+        "screenSharing": { "type": "boolean" },
+        "handRaised": { "type": "boolean" },
+        "lastSeen": { "type": "number" }
+      },
+      "required": ["id", "name"]
+    }
+  },
+  "firestoreRules": "firestore.rules"
+}
