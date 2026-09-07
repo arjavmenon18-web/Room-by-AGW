@@ -49,7 +49,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
   };
 
   const shareableUrl = createdRoomId
-    ? `${window.location.origin}/?room=${createdRoomId}`
+    ? `${window.location.origin}/join/${createdRoomId}`
     : '';
 
   const handleCopy = () => {

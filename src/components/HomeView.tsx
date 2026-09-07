@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useMeeting } from '../context/MeetingContext';
-import { Plus, ArrowRight, ArrowUpRight, Copy, Check } from 'lucide-react';
+import { Plus, ArrowRight, ArrowUpRight, Copy, Check, MessageSquare, Bookmark, Video } from 'lucide-react';
 
 interface HomeViewProps {
   onOpenCreate?: () => void;
@@ -24,7 +24,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const handleOpenCreate = onOpenCreate || onCreateRoom || (() => {});
   const handleOpenJoin = onOpenJoin || onJoinRoom || (() => {});
 
-  const { joinRoomById, atmosphere } = useMeeting();
+  const { joinRoomById, atmosphere, setView } = useMeeting();
   const isDark = atmosphere === 'obsidian';
   const [recentRoomsList, setRecentRoomsList] = useState<SavedRoom[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -58,13 +58,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
         : 'text-[#1a1917] selection:bg-[#148b94]/20 selection:text-[#1a1917]'
     }`}>
       <main className="max-w-3xl w-full mx-auto px-4 sm:px-6 pt-10 sm:pt-20 pb-12 sm:pb-16">
-        {/* Brand & Editorial Introduction */}
+        {/* Editorial Introduction */}
         <section className="space-y-4 mb-12 sm:mb-20">
           <div className="space-y-2">
-            <div className={`text-[10px] sm:text-[11px] uppercase tracking-[0.24em] font-mono font-medium pl-1 select-none transition-colors ${
-              isDark ? 'text-[#9c9588]' : 'text-[#968f82]'
-            }`}>
-              Armen GlobalWorks
+            <div className="flex items-center space-x-2">
+              <span className={`text-[11px] font-mono tracking-[0.2em] uppercase transition-colors ${
+                isDark ? 'text-[#a69e90]' : 'text-[#877f72]'
+              }`}>
+                Armen GlobalWorks
+              </span>
             </div>
             <h1 className={`font-serif text-6xl sm:text-8xl md:text-[98px] font-normal tracking-[-0.035em] leading-[0.88] select-none transition-colors duration-200 ${
               isDark ? 'text-[#f5f1ea]' : 'text-[#1a1917]'
@@ -153,29 +155,101 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </button>
         </section>
 
-        {/* Recent Rooms Section */}
-        <section className={`space-y-4 pt-6 border-t transition-colors ${
+        {/* Navigation to Chat, Keep, and Rooms */}
+        <section className={`mb-14 sm:mb-20 pt-6 border-t space-y-4 transition-colors ${
           isDark ? 'border-[#27231e]' : 'border-[#e8e2d5]/80'
         }`}>
-          <div className="flex items-center justify-between px-1">
-            <h3 className={`text-[10px] uppercase tracking-[0.24em] font-mono font-medium select-none transition-colors ${
-              isDark ? 'text-[#888173]' : 'text-[#948e82]'
-            }`}>
-              Recent
-            </h3>
-          </div>
-
-          {recentRoomsList.length === 0 ? (
-            <div className={`py-10 text-center rounded-2xl border transition-colors ${
-              isDark 
-                ? 'border-[#2a2620] bg-[#161513]/70 text-[#857e72]' 
-                : 'border-[#ded7ca]/70 bg-[#faf8f4]/60 text-[#8c867a]'
-            }`}>
-              <p className="text-xs font-light">
-                Your rooms will appear here.
-              </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Chat */}
+            <div
+              onClick={() => setView('chat')}
+              className={`p-4 sm:p-5 rounded-2xl border cursor-pointer group transition-all duration-200 flex flex-col justify-between ${
+                isDark 
+                  ? 'bg-[#181715] hover:bg-[#201d19] border-[#2a2620] hover:border-[#3e372e]' 
+                  : 'bg-[#faf8f4] hover:bg-[#f3efe6] border-[#ded7ca] hover:border-[#c8bfaf]'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`w-7 h-7 rounded-full border flex items-center justify-center text-[#148b94] ${
+                  isDark ? 'bg-[#22201c] border-[#312d26]' : 'bg-white border-[#ded8cc]'
+                }`}>
+                  <MessageSquare className="w-3.5 h-3.5" />
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-[#8a8479] group-hover:translate-x-1 group-hover:text-current transition-all" />
+              </div>
+              <div className="pt-4 space-y-1">
+                <div className="text-sm font-medium">Chat</div>
+                <p className="text-[11px] text-[#8a8479] leading-relaxed">
+                  Direct messages, project spaces, and team discussions.
+                </p>
+              </div>
             </div>
-          ) : (
+
+            {/* Keep */}
+            <div
+              onClick={() => setView('keep')}
+              className={`p-4 sm:p-5 rounded-2xl border cursor-pointer group transition-all duration-200 flex flex-col justify-between ${
+                isDark 
+                  ? 'bg-[#181715] hover:bg-[#201d19] border-[#2a2620] hover:border-[#3e372e]' 
+                  : 'bg-[#faf8f4] hover:bg-[#f3efe6] border-[#ded7ca] hover:border-[#c8bfaf]'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`w-7 h-7 rounded-full border flex items-center justify-center text-[#148b94] ${
+                  isDark ? 'bg-[#22201c] border-[#312d26]' : 'bg-white border-[#ded8cc]'
+                }`}>
+                  <Bookmark className="w-3.5 h-3.5" />
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-[#8a8479] group-hover:translate-x-1 group-hover:text-current transition-all" />
+              </div>
+              <div className="pt-4 space-y-1">
+                <div className="text-sm font-medium">Keep</div>
+                <p className="text-[11px] text-[#8a8479] leading-relaxed">
+                  Saved decisions, action tasks, and project memory.
+                </p>
+              </div>
+            </div>
+
+            {/* Rooms */}
+            <div
+              onClick={() => setView('rooms')}
+              className={`p-4 sm:p-5 rounded-2xl border cursor-pointer group transition-all duration-200 flex flex-col justify-between ${
+                isDark 
+                  ? 'bg-[#181715] hover:bg-[#201d19] border-[#2a2620] hover:border-[#3e372e]' 
+                  : 'bg-[#faf8f4] hover:bg-[#f3efe6] border-[#ded7ca] hover:border-[#c8bfaf]'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`w-7 h-7 rounded-full border flex items-center justify-center text-[#148b94] ${
+                  isDark ? 'bg-[#22201c] border-[#312d26]' : 'bg-white border-[#ded8cc]'
+                }`}>
+                  <Video className="w-3.5 h-3.5" />
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-[#8a8479] group-hover:translate-x-1 group-hover:text-current transition-all" />
+              </div>
+              <div className="pt-4 space-y-1">
+                <div className="text-sm font-medium">Rooms</div>
+                <p className="text-[11px] text-[#8a8479] leading-relaxed">
+                  Real-time video rooms and persistent meeting records.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Recent Rooms Section - Only show when real rooms exist */}
+        {recentRoomsList.length > 0 && (
+          <section className={`space-y-4 pt-6 border-t transition-colors ${
+            isDark ? 'border-[#27231e]' : 'border-[#e8e2d5]/80'
+          }`}>
+            <div className="flex items-center justify-between px-1">
+              <h3 className={`text-[10px] uppercase tracking-[0.24em] font-mono font-medium select-none transition-colors ${
+                isDark ? 'text-[#888173]' : 'text-[#948e82]'
+              }`}>
+                Recent
+              </h3>
+            </div>
+
             <div className={`divide-y rounded-2xl border overflow-hidden transition-colors ${
               isDark
                 ? 'divide-[#24211c] border-[#292620] bg-[#171614] shadow-[0_4px_16px_rgba(0,0,0,0.3)]'
@@ -227,23 +301,25 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </div>
               ))}
             </div>
-          )}
-        </section>
+          </section>
+        )}
       </main>
 
-      {/* Subtle Editorial Footer */}
+      {/* Footer */}
       <footer className={`max-w-3xl w-full mx-auto px-6 py-8 text-[11px] border-t flex items-center justify-between select-none transition-colors ${
         isDark 
           ? 'border-[#26231e] text-[#7a7467]' 
           : 'border-[#e8e2d5]/80 text-[#9c9588]'
       }`}>
-        <span className={`font-serif text-sm tracking-tight transition-colors ${
-          isDark ? 'text-[#9c9486]' : 'text-[#787266]'
-        }`}>
-          ROOM
-        </span>
-        <span className="font-mono tracking-[0.16em] uppercase text-[10px]">
-          Armen GlobalWorks
+        <div className="flex items-center space-x-2">
+          <span className={`font-serif text-sm tracking-tight transition-colors ${
+            isDark ? 'text-[#9c9486]' : 'text-[#787266]'
+          }`}>
+            ROOM
+          </span>
+        </div>
+        <span className="font-mono text-[10px] tracking-widest uppercase opacity-60">
+          AGW
         </span>
       </footer>
     </div>

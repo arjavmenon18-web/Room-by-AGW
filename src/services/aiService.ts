@@ -1,6 +1,6 @@
 /**
- * AI Assistant Service for ROOM by Armen GlobalWorks
- * Connects to server-side Gemini 2.5 Flash endpoints
+ * AI Assistant Service for ROOM
+ * Connects to server-side Gemini API endpoints
  */
 
 export interface SummarizeMeetingParams {
@@ -27,19 +27,11 @@ export class AiService {
       const data = await res.json();
       return data.summary;
     } catch (err: any) {
-      console.warn('AI summary fetch failed, using internal creative summary:', err.message);
-      return `### Executive Synthesis
-The **${params.roomName}** session concluded with unanimous alignment on the current aesthetic vision. The team approved maintaining Armen GlobalWorks' restrained, cinematic visual language while accelerating the post-production delivery timetable.
-
-### Key Creative & Technical Decisions
-- **Color Grading & Visual Tone**: Final approval given to the warm neutral baseline with subtle 35mm grain texture.
-- **Audio Spatialization**: Finalize dynamic binaural stem mix ahead of international client review.
-- **Pacing & Edit**: Locked sequence 04–07, prioritizing atmospheric transitions over abrupt cuts.
-
-### Action Items & Owners
-- **[Lead Editor]**: Sign off on updated sequence export by tomorrow morning.
-- **[Sound Designer]**: Master cue tracks 3 and 7 for spatial multichannel.
-- **[Armen GlobalWorks Core]**: Prepare delivery packaging and client presentation deck.`;
+      console.warn('AI summary fetch failed:', err.message);
+      const lines = (params.notes || '').split('\n').filter((l: string) => l.trim().length > 0);
+      return lines.length > 0
+        ? `### Meeting Summary\n${lines.slice(0, 5).join('\n')}`
+        : `### Meeting Summary\nNo notes or chat records were captured for this room.`;
     }
   }
 
@@ -59,7 +51,7 @@ The **${params.roomName}** session concluded with unanimous alignment on the cur
       return data.answer;
     } catch (err: any) {
       console.warn('AI query error:', err.message);
-      return `Armen Intelligence: We reviewed the current assets for "${roomContext?.roomName || 'ROOM'}". All deliverables align with the brand guidelines. Consider verifying the audio mix pacing in sequence 04.`;
+      return `ROOM Assistant: I am ready to assist with your meeting notes or room discussions.`;
     }
   }
 }

@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useMeeting } from '../../context/MeetingContext';
-import { X, Send } from 'lucide-react';
+import { useChatAndKeep } from '../../context/ChatAndKeepContext';
+import { X, Send, Bookmark, Check } from 'lucide-react';
 
 export const ChatPanel: React.FC = () => {
-  const { chatMessages, sendChatMessage, setActiveDrawer, user } = useMeeting();
+  const { chatMessages, sendChatMessage, setActiveDrawer, user, room } = useMeeting();
+  const { saveChatToKeep } = useChatAndKeep();
   const [text, setText] = useState('');
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -16,6 +19,20 @@ export const ChatPanel: React.FC = () => {
     if (!text.trim()) return;
     sendChatMessage(text.trim());
     setText('');
+  };
+
+  const handleSaveToKeep = async (msg: any) => {
+    await saveChatToKeep(
+      msg.content || msg.text,
+      `Meeting: ${room?.title || 'Session'}`,
+      undefined,
+      {
+        author: msg.senderName,
+        roomId: room?.id,
+        projectId: room?.projectContext?.id
+      }
+    );
+    setSavedIds(prev => new Set(prev).add(msg.id));
   };
 
   return (
@@ -57,8 +74,25 @@ export const ChatPanel: React.FC = () => {
                     {msg.timestamp}
                   </span>
                 </div>
-                <div className="text-xs text-[#faf8f5] leading-relaxed bg-[#211f1c] px-3.5 py-2.5 rounded-xl border border-[#2b2824] inline-block max-w-[95%] break-words">
-                  {msg.content || msg.text}
+                <div className="flex items-center justify-between group">
+                  <div className="text-xs text-[#faf8f5] leading-relaxed bg-[#211f1c] px-3.5 py-2.5 rounded-xl border border-[#2b2824] inline-block max-w-[95%] break-words">
+                    {msg.content || msg.text}
+                  </div>
+                  <button
+                    onClick={() => handleSaveToKeep(msg)}
+                    className={`ml-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${
+                      savedIds.has(msg.id)
+                        ? 'text-[#148b94] bg-[#148b94]/10 opacity-100'
+                        : 'text-[#8a8479] hover:text-[#148b94] hover:bg-[#252320]'
+                    }`}
+                    title="Save message to Keep"
+                  >
+                    {savedIds.has(msg.id) ? (
+                      <Check className="w-3.5 h-3.5" />
+                    ) : (
+                      <Bookmark className="w-3.5 h-3.5" />
+                    )}
+                  </button>
                 </div>
               </div>
             );

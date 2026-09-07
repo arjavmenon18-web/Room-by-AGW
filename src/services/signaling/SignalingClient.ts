@@ -7,6 +7,9 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'un
 
 export interface SignalingUser {
   id: string;
+  participantId?: string;
+  userId?: string;
+  sessionId?: string;
   name: string;
   role: 'host' | 'co-host' | 'guest';
   avatar?: string;
@@ -18,13 +21,24 @@ export interface SignalingUser {
 
 export interface SignalingEvents {
   onStatusChange: (status: ConnectionStatus) => void;
-  onJoinedRoom: (data: { assignedRole: string; existingParticipants: SignalingUser[]; totalParticipants: number }) => void;
+  onJoinedRoom: (data: {
+    assignedRole: string;
+    roomId?: string;
+    roomName?: string;
+    hostId?: string;
+    hostName?: string;
+    participantId?: string;
+    userId?: string;
+    sessionId?: string;
+    existingParticipants: SignalingUser[];
+    totalParticipants: number;
+  }) => void;
   onUserJoined: (user: SignalingUser) => void;
-  onUserLeft: (data: { id: string; name: string; remainingParticipants: number }) => void;
+  onUserLeft: (data: { id: string; name: string; remainingParticipants: number; totalParticipants?: number }) => void;
   onReceiveOffer: (senderId: string, sdp: RTCSessionDescriptionInit) => void;
   onReceiveAnswer: (senderId: string, sdp: RTCSessionDescriptionInit) => void;
   onReceiveIce: (senderId: string, candidate: RTCIceCandidateInit) => void;
-  onMediaStateChanged: (data: { peerId: string; audioEnabled?: boolean; videoEnabled?: boolean; isScreenSharing?: boolean; isHandRaised?: boolean }) => void;
+  onMediaStateChanged: (data: { id?: string; peerId: string; audioEnabled?: boolean; videoEnabled?: boolean; isScreenSharing?: boolean; isHandRaised?: boolean }) => void;
   onChatMessage: (msg: { id: string; senderId: string; senderName: string; text: string; timestamp: number }) => void;
   onError: (err: string) => void;
 }
@@ -39,6 +53,18 @@ export class SignalingClient {
   private reconnectTimer: any = null;
   private pingInterval: any = null;
   private messageQueue: string[] = [];
+  private lastJoinParams: {
+    roomId: string;
+    participantId: string;
+    peerId: string;
+    userId: string;
+    sessionId: string;
+    name: string;
+    role: 'host' | 'co-host' | 'guest';
+    avatar?: string;
+    audioEnabled: boolean;
+    videoEnabled: boolean;
+  } | null = null;
 
   private listeners: Partial<SignalingEvents> = {};
 
@@ -71,8 +97,22 @@ export class SignalingClient {
   }
 
   connect(): Promise<boolean> {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       return Promise.resolve(true);
+    }
+
+    if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+      return new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+          if (this.ws?.readyState === WebSocket.OPEN) {
+            clearInterval(checkInterval);
+            resolve(true);
+          } else if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+            clearInterval(checkInterval);
+            resolve(false);
+          }
+        }, 50);
+      });
     }
 
     this.setStatus('connecting');
@@ -174,21 +214,43 @@ export class SignalingClient {
 
   joinRoom(params: {
     roomId: string;
-    peerId: string;
+    participantId?: string;
+    peerId?: string;
+    userId?: string;
+    sessionId?: string;
     name: string;
     role: 'host' | 'co-host' | 'guest';
     avatar?: string;
     audioEnabled: boolean;
     videoEnabled: boolean;
   }) {
-    this.currentRoomId = params.roomId.trim().toUpperCase();
-    this.currentPeerId = params.peerId;
+    const effectiveParticipantId = params.participantId || params.peerId || `part-${Date.now()}`;
+    const effectiveUserId = params.userId || `usr-${effectiveParticipantId}`;
+    const effectiveSessionId = params.sessionId || `sess-${effectiveParticipantId}`;
+
+    this.currentRoomId = params.roomId.trim();
+    this.currentPeerId = effectiveParticipantId;
+    this.lastJoinParams = {
+      roomId: this.currentRoomId,
+      participantId: effectiveParticipantId,
+      peerId: effectiveParticipantId,
+      userId: effectiveUserId,
+      sessionId: effectiveSessionId,
+      name: params.name,
+      role: params.role,
+      avatar: params.avatar,
+      audioEnabled: params.audioEnabled,
+      videoEnabled: params.videoEnabled,
+    };
 
     this.send({
       type: 'join-room',
       payload: {
         roomId: this.currentRoomId,
-        peerId: params.peerId,
+        participantId: effectiveParticipantId,
+        peerId: effectiveParticipantId,
+        userId: effectiveUserId,
+        sessionId: effectiveSessionId,
         name: params.name,
         role: params.role,
         avatar: params.avatar,
@@ -245,6 +307,7 @@ export class SignalingClient {
   }
 
   leaveRoom() {
+    this.lastJoinParams = null;
     if (this.currentRoomId) {
       this.send({
         type: 'leave-room',

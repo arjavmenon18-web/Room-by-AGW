@@ -2,6 +2,8 @@ export type UserRole = 'host' | 'co-host' | 'guest';
 
 export interface User {
   id: string;
+  sessionId?: string;
+  participantId?: string;
   name: string;
   email: string;
   avatar?: string;
@@ -46,7 +48,10 @@ export interface Room {
 }
 
 export interface Participant {
-  id: string;
+  id: string; // Unique peer/connection ID in the room
+  userId?: string;
+  sessionId?: string;
+  participantId?: string;
   name: string;
   email?: string;
   avatar?: string;
@@ -155,5 +160,216 @@ export interface DeviceSettings {
 export type ActiveDrawerTab = 'chat' | 'participants' | 'workspace' | null;
 export type WorkspaceSubTab = 'notes' | 'files' | 'project' | 'ai';
 export type VideoLayoutMode = 'grid' | 'spotlight' | 'sidebar';
-export type AppView = 'home' | 'create-room' | 'join-room' | 'pre-join' | 'meeting' | 'waiting-room' | 'settings';
+export type AppView = 
+  | 'home' 
+  | 'chat' 
+  | 'keep' 
+  | 'rooms' 
+  | 'create-room' 
+  | 'join-room' 
+  | 'pre-join' 
+  | 'meeting' 
+  | 'waiting-room' 
+  | 'settings' 
+  | 'not-found' 
+  | 'room-not-found';
 export type AtmosphereMode = 'linen' | 'obsidian' | 'studio';
+
+// ==========================================
+// ROOM CHAT TYPES
+// ==========================================
+
+export type ConversationType = 'direct' | 'group' | 'project';
+
+export interface ConversationMember {
+  id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+  role?: string;
+  status?: 'online' | 'offline' | 'in-room';
+}
+
+export interface DirectChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  senderRole?: UserRole;
+  content: string;
+  timestamp: string;
+  rawTimestamp?: number;
+  type?: 'text' | 'file' | 'system' | 'room-invite';
+  replyTo?: {
+    id: string;
+    senderName: string;
+    content: string;
+  };
+  reactions: Record<string, string[]>; // emoji -> [userNames]
+  fileAttachment?: {
+    name: string;
+    size: string;
+    url?: string;
+    type: string;
+  };
+  sharedLink?: {
+    url: string;
+    title?: string;
+    description?: string;
+  };
+  roomInvite?: {
+    roomId: string;
+    roomTitle: string;
+    status: 'active' | 'ended';
+  };
+  savedToKeepId?: string;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  type: ConversationType;
+  members: ConversationMember[];
+  memberIds: string[];
+  projectId?: string;
+  projectTitle?: string;
+  lastMessage?: {
+    id: string;
+    text: string;
+    senderId: string;
+    senderName: string;
+    timestamp: string;
+  };
+  unreadCount?: number;
+  isPinned?: boolean;
+  isMuted?: boolean;
+  activeRoomId?: string; // If a meeting is live linked to this chat
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==========================================
+// ROOM KEEP TYPES (INTELLIGENT MEMORY)
+// ==========================================
+
+export type KeepCategory = 'idea' | 'decision' | 'task' | 'reference' | 'question';
+export type KeepStatus = 'suggested' | 'confirmed' | 'dismissed';
+
+export interface KeepSource {
+  type: 'meeting' | 'meeting-chat' | 'chat' | 'note' | 'file' | 'explicit';
+  id?: string;
+  title: string;
+  date: string; // e.g. "September 6, 2026"
+  timestamp?: number;
+  participants?: string[];
+  roomId?: string;
+  conversationId?: string;
+}
+
+export interface KeepItem {
+  id: string;
+  title: string;
+  content: string;
+  category: KeepCategory;
+  status: KeepStatus; // 'suggested' (AI suggestion) | 'confirmed' | 'dismissed'
+  confidence?: number;
+  source: KeepSource;
+  projectId?: string;
+  projectTitle?: string;
+  assignedTo?: string; // for tasks
+  dueDate?: string; // for tasks
+  completed?: boolean; // for tasks
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+  confirmedAt?: string;
+  createdBy?: string;
+  isAiGenerated?: boolean;
+}
+
+// ==========================================
+// MEETING RECORD (POST-MEETING CONTINUITY)
+// ==========================================
+
+export interface MeetingRecord {
+  id: string;
+  roomId: string;
+  roomTitle: string;
+  date: string;
+  startedAt: string;
+  endedAt: string;
+  durationSeconds: number;
+  durationFormatted: string;
+  hostName: string;
+  hostId: string;
+  participantCount: number;
+  participants: { id: string; name: string; avatar?: string; role?: string }[];
+  summary?: string;
+  notes?: string;
+  chatMessages: ChatMessage[];
+  decisions: string[];
+  tasks: { title: string; assignee?: string; completed?: boolean }[];
+  files: any[];
+  projectId?: string;
+  projectTitle?: string;
+  associatedConversationId?: string;
+}
+
+// ==========================================
+// PROJECT CONTAINER (UNIFIED LIVING MEMORY)
+// ==========================================
+
+export interface ProjectTimelineItem {
+  id: string;
+  date: string;
+  timestamp: number;
+  type: 'idea' | 'discussion' | 'decision' | 'task' | 'meeting';
+  title: string;
+  description: string;
+  source: string;
+  sourceId?: string;
+  author?: string;
+}
+
+export interface ProjectContainer {
+  id: string;
+  title: string;
+  description: string;
+  client?: string;
+  phase?: string;
+  members: ConversationMember[];
+  conversationId?: string;
+  linkedRoomIds: string[];
+  recentMeetings: {
+    id: string;
+    title: string;
+    date: string;
+    durationFormatted: string;
+  }[];
+  timeline: ProjectTimelineItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==========================================
+// UNIFIED SEARCH ACROSS EVERYTHING
+// ==========================================
+
+export interface UnifiedSearchResult {
+  query: string;
+  aiSynthesis?: string;
+  sourceTitle?: string;
+  items: {
+    id: string;
+    type: 'chat' | 'keep' | 'meeting' | 'project';
+    category?: KeepCategory;
+    title: string;
+    snippet: string;
+    date: string;
+    sourceContext?: string;
+    relevanceScore?: number;
+    metadata?: Record<string, any>;
+  }[];
+}
+

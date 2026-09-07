@@ -11,11 +11,20 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({ isOpen, onClose })
   const { user, joinRoomById, atmosphere } = useMeeting();
   const isDark = atmosphere === 'obsidian';
   const [roomCode, setRoomCode] = useState('');
-  const [displayName, setDisplayName] = useState(user.name);
+  const [displayName, setDisplayName] = useState(() => {
+    try {
+      const saved = localStorage.getItem('room_display_name');
+      if (saved) return saved;
+    } catch {}
+    if (user.name && user.name !== 'Guest User') {
+      return user.name;
+    }
+    return '';
+  });
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomCode.trim()) return;
 
@@ -38,20 +47,25 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({ isOpen, onClose })
       }
     }
 
-    // Save to real recent room history
+    const finalName = displayName.trim() || user.name || 'Guest Participant';
     try {
-      const stored = localStorage.getItem('room_user_history');
-      const history = stored ? JSON.parse(stored) : [];
-      const updated = [
-        { id: cleanCode, title: 'Room Session', timestamp: Date.now() },
-        ...history.filter((h: any) => h.id !== cleanCode),
-      ].slice(0, 10);
-      localStorage.setItem('room_user_history', JSON.stringify(updated));
-    } catch (err) {
-      console.warn('Could not update history:', err);
-    }
+      localStorage.setItem('room_display_name', finalName);
+    } catch {}
 
-    joinRoomById(cleanCode, displayName.trim() || user.name);
+    const success = await joinRoomById(cleanCode, finalName);
+    if (success) {
+      try {
+        const stored = localStorage.getItem('room_user_history');
+        const history = stored ? JSON.parse(stored) : [];
+        const updated = [
+          { id: cleanCode, title: 'Room Session', timestamp: Date.now() },
+          ...history.filter((h: any) => h.id !== cleanCode),
+        ].slice(0, 10);
+        localStorage.setItem('room_user_history', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Could not update history:', err);
+      }
+    }
     onClose();
   };
 
@@ -89,7 +103,7 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({ isOpen, onClose })
             </label>
             <input
               type="text"
-              placeholder="Room-agw-1042"
+              placeholder="e.g. Room-agw-1042"
               value={roomCode}
               onChange={(e) => setRoomCode(e.target.value)}
               required

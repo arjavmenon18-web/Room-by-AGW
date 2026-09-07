@@ -24,7 +24,7 @@ export const ParticipantsPanel: React.FC = () => {
 
   // Local participant
   const localParticipant: Participant = {
-    id: 'local-user',
+    id: user.id,
     name: user.name,
     email: user.email,
     role: user.role,
@@ -37,11 +37,11 @@ export const ParticipantsPanel: React.FC = () => {
     isHandRaised,
     isPinned: false,
     isWaiting: false,
-    initials: user.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase(),
+    initials: user.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() || 'U',
     connectionQuality: 'excellent',
   };
 
-  const allActiveParticipants = [localParticipant, ...participants];
+  const allActiveParticipants = [localParticipant, ...participants.filter((p) => p.id !== user.id)];
 
   return (
     <aside className="fixed inset-0 sm:relative sm:inset-auto w-full sm:w-80 h-full bg-[#181715] border-l border-[#262420] flex flex-col z-50 sm:z-30 select-none animate-in slide-in-from-right duration-200">
@@ -94,7 +94,7 @@ export const ParticipantsPanel: React.FC = () => {
         {/* Participants List */}
         <div className="p-2 space-y-1">
           {allActiveParticipants.map((p) => {
-            const isLocal = p.id === 'local-user';
+            const isLocal = p.id === user.id || p.id === 'local-user';
             const initials = p.initials || p.name.substring(0, 2).toUpperCase();
 
             return (

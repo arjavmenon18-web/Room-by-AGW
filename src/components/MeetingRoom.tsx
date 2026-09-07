@@ -111,7 +111,7 @@ export const MeetingRoom: React.FC = () => {
 
   // Local user participant object
   const localParticipant: Participant = {
-    id: 'local-user',
+    id: user.id,
     name: user.name,
     email: user.email,
     role: user.role,
@@ -122,13 +122,13 @@ export const MeetingRoom: React.FC = () => {
     audioLevel: localAudioLevel,
     isScreenSharing,
     isHandRaised,
-    isPinned: pinnedParticipantId === 'local-user',
+    isPinned: pinnedParticipantId === user.id || pinnedParticipantId === 'local-user',
     isWaiting: false,
-    initials: user.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase(),
+    initials: user.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() || 'U',
     connectionQuality: 'excellent',
   };
 
-  const allActiveParticipants = [localParticipant, ...participants];
+  const allActiveParticipants = [localParticipant, ...participants.filter((p) => p.id !== user.id)];
 
   const targetSpotlight = pinnedParticipantId
     ? allActiveParticipants.find((p) => p.id === pinnedParticipantId)
@@ -294,7 +294,7 @@ export const MeetingRoom: React.FC = () => {
                   <div key={p.id} className="h-full aspect-video flex-shrink-0">
                     <VideoTile
                       participant={p}
-                      isLocal={p.id === 'local-user'}
+                      isLocal={p.id === user.id || p.id === 'local-user'}
                       localStream={localStream}
                       isActiveSpeaker={p.id === activeSpeakerId}
                       isPinned={p.id === pinnedParticipantId}
@@ -313,7 +313,7 @@ export const MeetingRoom: React.FC = () => {
               <div className="flex-1 h-full min-h-[300px]">
                 <VideoTile
                   participant={targetSpotlight}
-                  isLocal={targetSpotlight.id === 'local-user'}
+                  isLocal={targetSpotlight.id === user.id || targetSpotlight.id === 'local-user'}
                   localStream={localStream}
                   isActiveSpeaker={targetSpotlight.id === activeSpeakerId}
                   isPinned={targetSpotlight.id === pinnedParticipantId}
@@ -333,7 +333,7 @@ export const MeetingRoom: React.FC = () => {
                     <div key={p.id} className="w-44 sm:w-52 lg:w-full aspect-video flex-shrink-0">
                       <VideoTile
                         participant={p}
-                        isLocal={p.id === 'local-user'}
+                        isLocal={p.id === user.id || p.id === 'local-user'}
                         localStream={localStream}
                         isActiveSpeaker={p.id === activeSpeakerId}
                         isPinned={p.id === pinnedParticipantId}
@@ -364,7 +364,7 @@ export const MeetingRoom: React.FC = () => {
                   <VideoTile
                     key={p.id}
                     participant={p}
-                    isLocal={p.id === 'local-user'}
+                    isLocal={p.id === user.id || p.id === 'local-user'}
                     localStream={localStream}
                     isActiveSpeaker={p.id === activeSpeakerId}
                     isPinned={p.id === pinnedParticipantId}
@@ -405,7 +405,7 @@ export const MeetingRoom: React.FC = () => {
         {/* Left: Understated Brand Mark */}
         <div className="hidden lg:flex items-center space-x-2 text-xs select-none">
           <span className="font-serif text-sm tracking-tight text-[#eae5dc]">ROOM</span>
-          <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-[#7a7367]">by Armen GlobalWorks</span>
+          <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-[#8a8274]">by Armen GlobalWorks</span>
         </div>
 
         {/* Center: Essential Meeting Controls */}

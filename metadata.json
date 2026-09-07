@@ -1,6 +1,6 @@
 {
-  "name": "ROOM",
-  "description": "A digital space to meet, create, and collaborate by Armen GlobalWorks.",
+  "name": "ROOM by Armen GlobalWorks",
+  "description": "A digital space to meet, create, and collaborate by Armen GlobalWorks (AGW).",
   "requestFramePermissions": [
     "camera",
     "microphone",

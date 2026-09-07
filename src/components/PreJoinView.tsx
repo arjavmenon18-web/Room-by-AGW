@@ -18,6 +18,7 @@ export const PreJoinView: React.FC = () => {
     setUser,
     setView,
     leaveRoom,
+    enterMeetingRoom,
     audioEnabled,
     videoEnabled,
     toggleAudio,
@@ -32,7 +33,26 @@ export const PreJoinView: React.FC = () => {
 
   const isDark = atmosphere === 'obsidian';
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [displayName, setDisplayName] = useState(user.name);
+  const isHost = Boolean(room && room.hostId === user.id) || user.role === 'host';
+
+  const [displayName, setDisplayName] = useState(() => {
+    if (isHost && user.name && user.name !== 'Guest User') {
+      return user.name;
+    }
+    try {
+      const sessSaved = sessionStorage.getItem('room_display_name');
+      if (sessSaved && (!room?.hostName || sessSaved !== room.hostName)) return sessSaved;
+      const localSaved = localStorage.getItem('room_display_name');
+      if (localSaved && (!room?.hostName || localSaved !== room.hostName)) return localSaved;
+    } catch {}
+    if (!isHost) {
+      if (user.name && user.name !== 'Guest User' && user.name !== room?.hostName) {
+        return user.name;
+      }
+      return '';
+    }
+    return user.name || '';
+  });
   const [showDeviceDrawer, setShowDeviceDrawer] = useState(false);
   const [permissionError, setPermissionError] = useState(false);
 
@@ -43,15 +63,8 @@ export const PreJoinView: React.FC = () => {
   }, [localStream, videoEnabled]);
 
   const handleJoin = () => {
-    if (displayName.trim()) {
-      setUser((u) => ({ ...u, name: displayName.trim() }));
-    }
-
-    if (room?.permissions?.waitingRoomEnabled && user.role === 'guest') {
-      setView('waiting-room');
-    } else {
-      setView('meeting');
-    }
+    const finalName = displayName.trim() || (isHost ? (user.name || 'Host') : 'Guest Participant');
+    enterMeetingRoom(finalName);
   };
 
   return (
@@ -254,7 +267,7 @@ export const PreJoinView: React.FC = () => {
               <p className={`text-sm font-light ${
                 isDark ? 'text-[#a39c8f]' : 'text-[#7c7569]'
               }`}>
-                Hosted by {room?.hostName || 'Host'}
+                {isHost ? 'You are the host of this room' : `Hosted by ${room?.hostName || 'Host'}`}
               </p>
             </div>
 
@@ -263,13 +276,13 @@ export const PreJoinView: React.FC = () => {
               <label className={`text-[11px] font-medium tracking-wide uppercase font-mono ${
                 isDark ? 'text-[#8f887b]' : 'text-[#857e72]'
               }`}>
-                Your name
+                {isHost ? 'Host name' : 'Your name'}
               </label>
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your name"
+                placeholder={isHost ? 'Your host name' : 'Your name'}
                 className={`w-full border focus:border-[#148b94] focus:ring-1 focus:ring-[#148b94]/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors ${
                   isDark 
                     ? 'bg-[#1c1a17] border-[#36312a] text-[#f5f1ea] placeholder-[#6e685f]' 
@@ -289,7 +302,7 @@ export const PreJoinView: React.FC = () => {
                     : 'bg-[#1a1917] hover:bg-[#2d2a26] text-white'
                 }`}
               >
-                <span>Join room</span>
+                <span>{isHost ? 'Enter room' : 'Join room'}</span>
               </button>
 
               {(!audioEnabled || !videoEnabled) && (
@@ -305,10 +318,11 @@ export const PreJoinView: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className={`max-w-4xl w-full mx-auto text-center text-xs py-3 select-none ${
-        isDark ? 'text-[#7a7467]' : 'text-[#9c9588]'
+      <footer className={`max-w-4xl w-full mx-auto text-xs py-3 select-none flex items-center justify-between border-t transition-colors ${
+        isDark ? 'border-[#26231e] text-[#7a7467]' : 'border-[#e8e2d5]/80 text-[#9c9588]'
       }`}>
-        ROOM by Armen GlobalWorks
+        <span className="font-serif text-sm">ROOM</span>
+        <span className="font-mono text-[10px] tracking-widest uppercase opacity-75">AGW</span>
       </footer>
     </div>
   );

@@ -1,6 +1,6 @@
 /**
  * ROOM WebRTC & Media Device Service
- * Armen GlobalWorks Digital Collaboration Architecture
+ * by Armen GlobalWorks (AGW)
  * 
  * Provides production-ready WebRTC primitives:
  * - Local hardware media stream capture (Camera, Mic)

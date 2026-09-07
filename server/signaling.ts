@@ -1,9 +1,13 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import type { IncomingMessage, Server } from 'http';
+import { roomManager } from './rooms';
 
 export interface ParticipantSession {
   ws: WebSocket;
+  participantId: string;
   peerId: string;
+  userId: string;
+  sessionId: string;
   roomId: string;
   name: string;
   role: 'host' | 'co-host' | 'guest';
@@ -87,16 +91,67 @@ export class RoomSignalingServer {
       }
 
       case 'join-room': {
-        const { roomId, peerId, name, role, audioEnabled, videoEnabled, avatar } = msg.payload || {};
-        if (!roomId || !peerId) {
+        const {
+          roomId,
+          participantId,
+          peerId,
+          userId,
+          sessionId,
+          name,
+          role,
+          audioEnabled,
+          videoEnabled,
+          avatar
+        } = msg.payload || {};
+
+        if (!roomId) {
           ws.send(JSON.stringify({
             type: 'error',
-            payload: { message: 'roomId and peerId are required to join' }
+            payload: { message: 'roomId is required to join' }
           }));
           return;
         }
 
-        const cleanRoomId = roomId.trim().toUpperCase();
+        // 1. Canonical Room lookup & validation
+        let canonicalRoom = roomManager.getRoom(roomId);
+        if (!canonicalRoom) {
+          // If role was explicitly host and room does not exist, initialize canonical room
+          if (role === 'host') {
+            canonicalRoom = roomManager.createRoom({
+              id: roomId,
+              hostId: userId || peerId || `usr-${Math.random().toString(36).substring(2, 9)}`,
+              hostName: (name && name.trim()) ? name.trim() : 'Room Host',
+            });
+          } else {
+            // Strictly JOIN EXISTING ROOM: do not create room for guest
+            ws.send(JSON.stringify({
+              type: 'error',
+              payload: { code: 'ROOM_NOT_FOUND', message: `Room ${roomId} does not exist.` }
+            }));
+            return;
+          }
+        }
+
+        const cleanRoomId = canonicalRoom.id;
+
+        // 2. Strict Identity Separation:
+        // Participant ID / Peer ID: unique per connection / tab
+        const effectiveParticipantId = participantId || peerId || sessionId || `part-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        // User ID: identifies the person
+        const effectiveUserId = userId || `usr-${effectiveParticipantId}`;
+        // Session ID: identifies the connection/tab
+        const effectiveSessionId = sessionId || `sess-${effectiveParticipantId}`;
+
+        // 3. Strict Role Resolution:
+        // ONLY the user whose userId matches canonicalRoom.hostId can be 'host'!
+        const isHost = Boolean(canonicalRoom.hostId && canonicalRoom.hostId === effectiveUserId);
+        const assignedRole: 'host' | 'co-host' | 'guest' = isHost ? 'host' : 'guest';
+
+        // 4. Display Name Resolution:
+        // Distinct participant identity - never copy room host's name for guest joiners!
+        const participantName = (name && name.trim()) 
+          ? name.trim() 
+          : (isHost ? (canonicalRoom.hostName || 'Room Host') : 'Guest Participant');
 
         // Create room bucket if not existing
         if (!this.rooms.has(cleanRoomId)) {
@@ -107,10 +162,13 @@ export class RoomSignalingServer {
         // Create session
         const session: ParticipantSession = {
           ws,
-          peerId,
+          participantId: effectiveParticipantId,
+          peerId: effectiveParticipantId,
+          userId: effectiveUserId,
+          sessionId: effectiveSessionId,
           roomId: cleanRoomId,
-          name: name || 'Guest User',
-          role: role || (roomPeers.size === 0 ? 'host' : 'guest'),
+          name: participantName,
+          role: assignedRole,
           avatar: avatar || undefined,
           audioEnabled: audioEnabled !== false,
           videoEnabled: videoEnabled !== false,
@@ -119,14 +177,32 @@ export class RoomSignalingServer {
           joinedAt: Date.now()
         };
 
-        roomPeers.set(peerId, session);
+        roomPeers.set(effectiveParticipantId, session);
         this.socketToSession.set(ws, session);
 
-        // Collect existing peers to return to the new joiner
+        // Synchronize with authoritative RoomManager
+        roomManager.addParticipant(cleanRoomId, {
+          participantId: effectiveParticipantId,
+          userId: effectiveUserId,
+          sessionId: effectiveSessionId,
+          name: participantName,
+          role: assignedRole,
+          avatar: session.avatar,
+          audioEnabled: session.audioEnabled,
+          videoEnabled: session.videoEnabled,
+          isScreenSharing: false,
+          isHandRaised: false,
+          joinedAt: session.joinedAt
+        });
+
+        // Collect existing peers in the room to return to the new joiner
         const existingParticipants = Array.from(roomPeers.values())
-          .filter((s) => s.peerId !== peerId)
+          .filter((s) => s.participantId !== effectiveParticipantId)
           .map((s) => ({
-            id: s.peerId,
+            id: s.participantId,
+            participantId: s.participantId,
+            userId: s.userId,
+            sessionId: s.sessionId,
             name: s.name,
             role: s.role,
             avatar: s.avatar,
@@ -140,32 +216,43 @@ export class RoomSignalingServer {
         ws.send(JSON.stringify({
           type: 'joined-room',
           roomId: cleanRoomId,
-          peerId,
+          peerId: effectiveParticipantId,
           payload: {
             assignedRole: session.role,
+            roomId: cleanRoomId,
+            roomName: canonicalRoom.name,
+            hostId: canonicalRoom.hostId,
+            hostName: canonicalRoom.hostName,
+            participantId: effectiveParticipantId,
+            userId: effectiveUserId,
+            sessionId: effectiveSessionId,
             existingParticipants,
             totalParticipants: roomPeers.size
           }
         }));
 
         // Broadcast to all other peers in the room that a new user joined
-        this.broadcastToRoom(cleanRoomId, peerId, {
+        this.broadcastToRoom(cleanRoomId, effectiveParticipantId, {
           type: 'user-joined',
           roomId: cleanRoomId,
-          peerId,
+          peerId: effectiveParticipantId,
           payload: {
-            id: peerId,
+            id: effectiveParticipantId,
+            participantId: effectiveParticipantId,
+            userId: effectiveUserId,
+            sessionId: effectiveSessionId,
             name: session.name,
             role: session.role,
             avatar: session.avatar,
             audioEnabled: session.audioEnabled,
             videoEnabled: session.videoEnabled,
             isScreenSharing: false,
-            isHandRaised: false
+            isHandRaised: false,
+            totalParticipants: roomPeers.size
           }
         });
 
-        console.log(`[Signaling] Peer ${peerId} (${session.name}) joined room ${cleanRoomId}. Total: ${roomPeers.size}`);
+        console.log(`[Signaling] Participant joined: "${session.name}" (id: ${effectiveParticipantId}, userId: ${effectiveUserId}, role: ${session.role}) into room ${cleanRoomId}. Total active in room: ${roomPeers.size}`);
         break;
       }
 
@@ -219,12 +306,23 @@ export class RoomSignalingServer {
           if (isScreenSharing !== undefined) session.isScreenSharing = isScreenSharing;
           if (isHandRaised !== undefined) session.isHandRaised = isHandRaised;
 
+          // Update canonical RoomManager
+          roomManager.updateParticipantMedia(session.roomId, session.participantId, {
+            audioEnabled: session.audioEnabled,
+            videoEnabled: session.videoEnabled,
+            isScreenSharing: session.isScreenSharing,
+            isHandRaised: session.isHandRaised,
+          });
+
           this.broadcastToRoom(session.roomId, session.peerId, {
             type: 'media-state-changed',
             peerId: session.peerId,
             roomId: session.roomId,
             payload: {
+              id: session.participantId,
               peerId: session.peerId,
+              participantId: session.participantId,
+              userId: session.userId,
               audioEnabled: session.audioEnabled,
               videoEnabled: session.videoEnabled,
               isScreenSharing: session.isScreenSharing,
@@ -268,8 +366,11 @@ export class RoomSignalingServer {
     const session = this.socketToSession.get(ws);
     if (!session) return;
 
-    const { roomId, peerId, name } = session;
+    const { roomId, peerId, participantId, userId, name } = session;
     this.socketToSession.delete(ws);
+
+    // Remove from canonical RoomManager
+    roomManager.removeParticipant(roomId, participantId);
 
     const roomPeers = this.rooms.get(roomId);
     if (roomPeers) {
@@ -281,18 +382,21 @@ export class RoomSignalingServer {
         roomId,
         peerId,
         payload: {
-          id: peerId,
+          id: participantId || peerId,
+          participantId: participantId || peerId,
+          userId,
           name,
-          remainingParticipants: roomPeers.size
+          remainingParticipants: roomPeers.size,
+          totalParticipants: roomPeers.size
         }
       });
 
-      console.log(`[Signaling] Peer ${peerId} left room ${roomId}. Remaining: ${roomPeers.size}`);
+      console.log(`[Signaling] Participant "${name}" (${peerId}) left room ${roomId}. Remaining in room: ${roomPeers.size}`);
 
-      // Clean up empty room
+      // Clean up empty active connection map for this room
       if (roomPeers.size === 0) {
         this.rooms.delete(roomId);
-        console.log(`[Signaling] Room ${roomId} is now empty and cleaned up.`);
+        console.log(`[Signaling] Room ${roomId} has 0 active connections. Preserving canonical metadata in RoomManager.`);
       }
     }
   }

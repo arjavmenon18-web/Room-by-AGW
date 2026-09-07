@@ -24,6 +24,7 @@ import { WorkspaceSubTab } from '../../types';
 
 export const WorkspacePanel: React.FC = () => {
   const {
+    user,
     room,
     setActiveDrawer,
     workspaceTab,
@@ -60,7 +61,7 @@ export const WorkspacePanel: React.FC = () => {
     addProjectAsset({
       title: newAssetTitle.trim(),
       category: 'document',
-      author: 'Arjav Menon',
+      author: user?.name || 'User',
       size: '1.2 MB',
       version: 'v1.0',
       status: 'in-review',
@@ -80,7 +81,7 @@ export const WorkspacePanel: React.FC = () => {
           <div className="flex items-center space-x-2">
             <Layers className="w-4 h-4 text-[#d97746]" />
             <h3 className="text-sm font-medium text-[#ede8df]">
-              Creative Workspace
+              Workspace
             </h3>
           </div>
           <button
@@ -156,7 +157,7 @@ export const WorkspacePanel: React.FC = () => {
             />
 
             <div className="flex items-center justify-between text-[11px] text-[#736d62] pt-1">
-              <span>Synchronized with Armen GlobalWorks Project Binder</span>
+              <span>Notes synchronized locally</span>
               <button
                 onClick={generateMeetingSummary}
                 className="text-[#d97746] hover:underline font-mono"
@@ -248,18 +249,18 @@ export const WorkspacePanel: React.FC = () => {
             <div className="p-3.5 rounded-xl bg-[#1a1816] border border-[#2b2721] space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono uppercase text-[#d97746] tracking-wider font-semibold">
-                  Armen GlobalWorks Project Suite
+                  Project Workspace
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-[#2b221a] text-[#d97746] border border-[#3d2b1d] font-mono">
-                  Post-Production
+                  Active
                 </span>
               </div>
               <h4 className="text-sm font-serif text-[#ede8df] font-normal">
-                {room?.projectContext?.title || 'Dune Horizon — Global Release'}
+                {room?.projectContext?.title || room?.title || 'Shared Project'}
               </h4>
               <p className="text-[11px] text-[#8f887c] leading-relaxed">
                 {room?.projectContext?.description ||
-                  'A cinematic sci-fi atmospheric narrative exploring tactile hardware and deep space transit.'}
+                  'Collaborative project workspace for meetings, notes, and shared assets.'}
               </p>
             </div>
 
@@ -310,21 +311,21 @@ export const WorkspacePanel: React.FC = () => {
             {/* Studio Project Branches */}
             <div className="p-3 rounded-xl bg-[#161513] border border-[#26231e] space-y-2 text-xs text-[#8f887c]">
               <div className="font-mono text-[10px] uppercase text-[#a8a092]">
-                Connected Production Repositories
+                Connected Workspaces
               </div>
               <div className="flex justify-between">
-                <span>DaVinci Resolve Project Library</span>
-                <span className="text-[#ede8df] font-mono">v19 Studio (Post-02)</span>
+                <span>Shared Files & Documents</span>
+                <span className="text-[#ede8df] font-mono">Live</span>
               </div>
               <div className="flex justify-between">
-                <span>Dolby Atmos Spatial Session</span>
-                <span className="text-[#ede8df] font-mono">7.1.4 BWF Stem</span>
+                <span>Project Notes & Memory</span>
+                <span className="text-[#ede8df] font-mono">Synchronized</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* TAB 4: ARMEN INTELLIGENCE (AI) */}
+        {/* TAB 4: AI ASSISTANT */}
         {workspaceTab === 'ai' && (
           <div className="space-y-4 h-full flex flex-col">
             {/* Generate Summary Trigger */}
@@ -332,11 +333,11 @@ export const WorkspacePanel: React.FC = () => {
               <div className="flex items-center space-x-2 text-xs text-[#d97746]">
                 <Sparkles className="w-4 h-4" />
                 <span className="font-medium font-mono uppercase tracking-wider text-[11px]">
-                  Armen Intelligence Engine (Gemini 2.5 Flash)
+                  Armen Intelligence Engine
                 </span>
               </div>
               <p className="text-xs text-[#9e9689] leading-relaxed">
-                Generate an editorial executive summary synthesizing chat exchanges, notes, and discussion decisions.
+                Generate an executive synthesis capturing room discussion, notes, and decisions.
               </p>
               <button
                 onClick={generateMeetingSummary}
@@ -383,7 +384,7 @@ export const WorkspacePanel: React.FC = () => {
             {/* In-Room AI Q&A Dialogue */}
             <div className="flex-1 flex flex-col space-y-2 pt-2 border-t border-[#24211d]">
               <span className="text-[11px] font-mono uppercase text-[#8f887c]">
-                In-Room Production Strategist
+                Armen Intelligence
               </span>
 
               <div className="flex-1 space-y-2 overflow-y-auto max-h-48 text-xs">
@@ -397,7 +398,7 @@ export const WorkspacePanel: React.FC = () => {
                     }`}
                   >
                     <div className="text-[10px] font-mono text-[#7d7568] mb-1">
-                      {item.role === 'user' ? 'You' : 'Armen Intelligence'}
+                      {item.role === 'user' ? 'You' : 'Armen AI'}
                     </div>
                     <p className="leading-relaxed">{item.text}</p>
                   </div>
@@ -414,7 +415,7 @@ export const WorkspacePanel: React.FC = () => {
               >
                 <input
                   type="text"
-                  placeholder="Ask Armen AI about this project..."
+                  placeholder="Ask Armen AI about this session or project..."
                   value={aiChatQuery}
                   onChange={(e) => setAiChatQuery(e.target.value)}
                   disabled={isAiAsking}

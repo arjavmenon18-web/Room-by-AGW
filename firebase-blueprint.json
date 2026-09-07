@@ -52,6 +52,84 @@
         "lastSeen": { "type": "number" }
       },
       "required": ["id", "name"]
+    },
+    "conversations": {
+      "title": "Conversation",
+      "description": "ROOM persistent Chat conversation or space",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string" },
+        "memberIds": { "type": "array" },
+        "projectId": { "type": "string" },
+        "isPinned": { "type": "boolean" },
+        "isMuted": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "type"]
+    },
+    "conversations/messages": {
+      "title": "DirectChatMessage",
+      "description": "Persistent chat messages in ROOM Chat conversations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "reactions": { "type": "object" }
+      },
+      "required": ["id", "conversationId", "senderId", "content"]
+    },
+    "keepItems": {
+      "title": "KeepItem",
+      "description": "ROOM Keep intelligent memory item (ideas, decisions, tasks, references, questions)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string" },
+        "projectId": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "source": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "category", "status"]
+    },
+    "meetingRecords": {
+      "title": "MeetingRecord",
+      "description": "Persistent post-meeting archive with continuity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "roomId": { "type": "string" },
+        "roomTitle": { "type": "string" },
+        "date": { "type": "string" },
+        "durationFormatted": { "type": "string" },
+        "participantCount": { "type": "number" },
+        "summary": { "type": "string" },
+        "decisions": { "type": "array" },
+        "tasks": { "type": "array" }
+      },
+      "required": ["id", "roomId", "roomTitle"]
+    },
+    "projects": {
+      "title": "Project",
+      "description": "ROOM Project container connecting conversations, meetings, files and memories",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "timeline": { "type": "array" }
+      },
+      "required": ["id", "title"]
     }
   },
   "firestoreRules": "firestore.rules"

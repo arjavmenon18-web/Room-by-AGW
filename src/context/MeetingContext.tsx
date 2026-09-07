@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   User,
+  UserRole,
   Room,
   Participant,
   ChatMessage,
@@ -74,8 +75,12 @@ interface MeetingContextType {
   durationFormatted: string;
   isHost: boolean;
   createInstantRoom: (title?: string, permissions?: Partial<RoomPermissions>, createMeetBridge?: boolean, customRoomId?: string) => Promise<string>;
-  joinRoomById: (roomId: string, displayName?: string) => void;
+  joinRoomById: (roomId: string, displayName?: string) => Promise<boolean>;
+  enterMeetingRoom: (enteredDisplayName?: string) => void;
   leaveRoom: (endForAll?: boolean) => void;
+  roomNotFoundCode: string | null;
+  setRoomNotFoundCode: (code: string | null) => void;
+  isValidatingRoom: boolean;
 
   // Media & Hardware
   audioEnabled: boolean;
@@ -186,16 +191,55 @@ function normalizeRoomCode(raw: string): string {
   return trimmed;
 }
 
+// Generate or retrieve per-tab session identity
+function getOrCreateSessionId(): string {
+  try {
+    let existing = sessionStorage.getItem('room_session_id');
+    if (existing && existing.startsWith('sess-')) return existing;
+    const newId = `sess-${Math.random().toString(36).substring(2, 9)}`;
+    sessionStorage.setItem('room_session_id', newId);
+    return newId;
+  } catch {
+    return `sess-${Math.random().toString(36).substring(2, 9)}`;
+  }
+}
+
+// Generate or retrieve tab-isolated user identity for guest sessions
+function getOrCreateUserId(): string {
+  try {
+    let existing = sessionStorage.getItem('room_user_id');
+    if (existing && existing.startsWith('usr-')) return existing;
+    const newId = `usr-${Math.random().toString(36).substring(2, 9)}`;
+    sessionStorage.setItem('room_user_id', newId);
+    return newId;
+  } catch {
+    return `usr-${Math.random().toString(36).substring(2, 9)}`;
+  }
+}
+
+// Retrieve saved display name if user configured it previously in this session
+function getSavedDisplayName(): string {
+  try {
+    return sessionStorage.getItem('room_display_name') || localStorage.getItem('room_display_name') || '';
+  } catch {
+    return '';
+  }
+}
+
 export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Navigation & User
+  // Navigation & User - decoupled from host identity
   const [view, setView] = useState<AppView>('home');
   const [user, setUser] = useState<User>(() => {
-    const randomSuffix = Math.random().toString(36).substring(2, 7);
+    const userId = getOrCreateUserId();
+    const sessionId = getOrCreateSessionId();
+    const savedName = getSavedDisplayName();
     return {
-      id: `usr-${randomSuffix}`,
-      name: 'Arjav Menon',
-      email: 'arjav@armenglobal.works',
-      role: 'host',
+      id: userId,
+      sessionId,
+      participantId: `part-${sessionId}`,
+      name: savedName || 'Guest User',
+      email: '',
+      role: 'guest',
     };
   });
 
@@ -266,6 +310,8 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Active Room State
   const [room, setRoom] = useState<Room | null>(null);
+  const [roomNotFoundCode, setRoomNotFoundCode] = useState<string | null>(null);
+  const [isValidatingRoom, setIsValidatingRoom] = useState<boolean>(false);
   const [durationSeconds, setDurationSeconds] = useState<number>(0);
   const durationTimerRef = useRef<any>(null);
 
@@ -319,12 +365,7 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isAiSummarizing, setIsAiSummarizing] = useState<boolean>(false);
   const [aiChatQuery, setAiChatQuery] = useState<string>('');
-  const [aiChatHistory, setAiChatHistory] = useState<{ role: 'user' | 'assistant'; text: string }[]>([
-    {
-      role: 'assistant',
-      text: 'Good morning. I am Armen Intelligence, initialized for this creative review. How can I assist with this project or the meeting notes?',
-    },
-  ]);
+  const [aiChatHistory, setAiChatHistory] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
   const [isAiAsking, setIsAiAsking] = useState<boolean>(false);
 
   // History & Schedule
@@ -918,11 +959,15 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }
 
+      const hostDisplayName = (user.name && user.name !== 'Guest User') 
+        ? user.name 
+        : (getSavedDisplayName() || 'Room Host');
+
       const newRoom: Room = {
         id: roomId,
-        title: title || 'Armen GlobalWorks ROOM Session',
+        title: title?.trim() || `Room ${roomId}`,
         hostId: user.id,
-        hostName: user.name,
+        hostName: hostDisplayName,
         createdAt: new Date().toISOString(),
         durationSeconds: 0,
         permissions: {
@@ -932,14 +977,16 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           muteOnEntry: permissions.muteOnEntry ?? false,
           hostApprovalRequired: permissions.hostApprovalRequired ?? false,
         },
-        projectContext: DEFAULT_PROJECT_CONTEXT,
+        projectContext: undefined,
         meetSpaceUri: meetUri,
         isLocked: false,
       };
 
       setRoom(newRoom);
       setDurationSeconds(0);
-      setUser((u) => ({ ...u, role: 'host' }));
+      const hostUser: User = { ...user, role: 'host', name: hostDisplayName };
+      userRef.current = hostUser;
+      setUser(hostUser);
       setParticipants([]);
       setChatMessages([]);
 
@@ -950,74 +997,222 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setSyncStatus('synced');
       });
 
+      // Authoritatively register room in Server RoomManager
+      try {
+        await fetch('/api/rooms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: roomId,
+            name: newRoom.title,
+            hostId: user.id,
+            hostName: hostDisplayName,
+          }),
+        });
+      } catch (e) {
+        console.warn('Could not register room in server room manager:', e);
+      }
+
+      setRoomNotFoundCode(null);
       await initLocalMedia();
+      try {
+        window.history.pushState(null, '', `/join/${roomId}`);
+      } catch (e) {
+        // ignore
+      }
       setView('pre-join');
       return roomId;
     },
     [user, initLocalMedia]
   );
 
-  // Join Room by Code or Link
+  // Join Room by Code or Link with real backend validation
   const joinRoomById = useCallback(
-    async (roomId: string, displayName?: string) => {
+    async (roomId: string, displayName?: string): Promise<boolean> => {
       const cleanId = normalizeRoomCode(roomId);
 
       // If user is already active in a meeting for this room, do not interrupt
       if (viewRef.current === 'meeting' && roomRef.current?.id === cleanId) {
-        return;
+        return true;
+      }
+
+      setIsValidatingRoom(true);
+      setRoomNotFoundCode(null);
+
+      setSyncStatus('syncing');
+      let remote: any = null;
+
+      // 1. Authoritative check against Server RoomManager
+      try {
+        const joinRes = await fetch(`/api/rooms/${encodeURIComponent(cleanId)}/join`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: userRef.current.id,
+            participantId: `part-${userRef.current.sessionId || userRef.current.id}`,
+            name: displayName || userRef.current.name,
+          }),
+        });
+        if (joinRes.ok) {
+          const joinData = await joinRes.json();
+          if (joinData.success && joinData.room) {
+            remote = {
+              id: joinData.room.id,
+              title: joinData.room.name || `ROOM Session (${cleanId})`,
+              hostId: joinData.room.hostId || 'host',
+              hostName: joinData.room.hostName || 'Host',
+              createdAt: joinData.room.createdAt,
+              durationSeconds: 0,
+              permissions: joinData.room.permissions,
+              isLocked: joinData.room.isLocked,
+              assignedRole: joinData.assignedRole,
+            };
+          }
+        }
+      } catch (e) {
+        // network fallback
+      }
+
+      // 2. Fallback check against Firestore
+      if (!remote) {
+        const firestoreRoom = await getRoomFromFirestore(cleanId);
+        if (firestoreRoom) {
+          remote = firestoreRoom;
+          // Synchronize room to server room manager
+          try {
+            await fetch('/api/rooms', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: firestoreRoom.id,
+                name: firestoreRoom.title,
+                hostId: firestoreRoom.hostId,
+                hostName: firestoreRoom.hostName,
+              }),
+            });
+          } catch {}
+        }
+      }
+
+      setSyncStatus('synced');
+      setIsValidatingRoom(false);
+
+      if (!remote) {
+        // Room does NOT exist! Do NOT create a fake room or participants.
+        setRoom(null);
+        setRoomNotFoundCode(cleanId);
+        setView('room-not-found');
+        return false;
+      }
+
+      // CRITICAL ARCHITECTURAL SEPARATION:
+      // Host identity vs Guest identity:
+      // If user.id === remote.hostId, role is 'host'.
+      // If user.id !== remote.hostId, role is 'guest'. Never inherit host identity!
+      const currentUserId = userRef.current.id;
+      const isActuallyHost = Boolean(remote.hostId && remote.hostId === currentUserId);
+      const assignedRole: UserRole = remote.assignedRole || (isActuallyHost ? 'host' : 'guest');
+
+      const savedDisplayName = getSavedDisplayName();
+      let resolvedName: string;
+      if (displayName?.trim()) {
+        resolvedName = displayName.trim();
+      } else if (isActuallyHost) {
+        resolvedName = userRef.current.name && userRef.current.name !== 'Guest User' ? userRef.current.name : (remote.hostName || 'Room Host');
+      } else {
+        // GUEST USER - NEVER inherit hostName!
+        resolvedName = (savedDisplayName && savedDisplayName !== remote.hostName) 
+          ? savedDisplayName 
+          : (userRef.current.name && userRef.current.name !== 'Guest User' && userRef.current.name !== remote.hostName ? userRef.current.name : 'Guest Participant');
       }
 
       setUser((u) => {
-        const isDefaultHost = u.role === 'host' && u.name === 'Arjav Menon';
-        const newId = isDefaultHost ? `usr-${Math.random().toString(36).substring(2, 7)}` : u.id;
-        return {
+        const updated: User = {
           ...u,
-          id: newId,
-          name: displayName || (isDefaultHost ? 'Guest Participant' : u.name),
-          role: 'guest',
+          role: assignedRole,
+          name: resolvedName,
         };
+        userRef.current = updated;
+        return updated;
       });
-
-      setSyncStatus('syncing');
-      const remote = await getRoomFromFirestore(cleanId);
-      setSyncStatus('synced');
-
-      const targetTitle = remote?.title || `ROOM Session (${cleanId})`;
-      const targetHost = remote?.hostName || 'Host';
 
       const targetRoom: Room = {
         id: cleanId,
-        title: targetTitle,
-        hostId: remote?.hostId || 'host',
-        hostName: targetHost,
-        createdAt: remote?.createdAt || new Date().toISOString(),
+        title: remote.title || `ROOM Session (${cleanId})`,
+        hostId: remote.hostId || 'host',
+        hostName: remote.hostName || 'Host',
+        createdAt: remote.createdAt || new Date().toISOString(),
         durationSeconds: 0,
-        permissions: remote?.permissions || {
+        permissions: remote.permissions || {
           waitingRoomEnabled: false,
           allowGuestScreenShare: true,
           allowGuestChat: true,
           muteOnEntry: false,
           hostApprovalRequired: false,
         },
-        projectContext: DEFAULT_PROJECT_CONTEXT,
-        meetSpaceUri: remote?.meetSpaceUri,
-        meetSpaceId: remote?.meetSpaceId,
-        isLocked: false,
+        projectContext: remote.projectContext || DEFAULT_PROJECT_CONTEXT,
+        meetSpaceUri: remote.meetSpaceUri,
+        meetSpaceId: remote.meetSpaceId,
+        isLocked: Boolean(remote.isLocked),
       };
-
-      if (!remote) {
-        saveRoomToFirestore(targetRoom);
-      }
 
       setRoom(targetRoom);
       setDurationSeconds(0);
       setParticipants([]);
       setChatMessages([]);
       await initLocalMedia();
+      try {
+        window.history.replaceState(null, '', `/join/${cleanId}`);
+      } catch (e) {
+        // ignore
+      }
       setView('pre-join');
+      return true;
     },
     [initLocalMedia]
   );
+
+  // Transition from PreJoinView into the active meeting room with user-confirmed name
+  const enterMeetingRoom = useCallback((enteredDisplayName?: string) => {
+    const currentRoom = roomRef.current;
+    const currentUserId = userRef.current.id;
+
+    // Check whether current user is actually the host of this room
+    const isActuallyHost = Boolean(currentRoom && currentRoom.hostId && currentRoom.hostId === currentUserId);
+    const assignedRole: UserRole = isActuallyHost ? 'host' : 'guest';
+
+    let finalName = enteredDisplayName?.trim();
+    if (!finalName) {
+      if (isActuallyHost) {
+        finalName = userRef.current.name || currentRoom?.hostName || 'Room Host';
+      } else {
+        const saved = getSavedDisplayName();
+        finalName = (saved && saved !== currentRoom?.hostName) 
+          ? saved 
+          : (userRef.current.name && userRef.current.name !== 'Guest User' && userRef.current.name !== currentRoom?.hostName ? userRef.current.name : 'Guest Participant');
+      }
+    }
+
+    try {
+      sessionStorage.setItem('room_display_name', finalName);
+      localStorage.setItem('room_display_name', finalName);
+    } catch {}
+
+    const updatedUser: User = {
+      ...userRef.current,
+      name: finalName,
+      role: assignedRole,
+    };
+
+    userRef.current = updatedUser;
+    setUser(updatedUser);
+
+    if (currentRoom?.permissions?.waitingRoomEnabled && assignedRole === 'guest') {
+      setView('waiting-room');
+    } else {
+      setView('meeting');
+    }
+  }, []);
 
   // Leave room with full WebRTC and WebSocket teardown
   const leaveRoom = useCallback(
@@ -1042,6 +1237,7 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (endForAll) {
         setRoom(null);
       }
+      setRoomNotFoundCode(null);
       try {
         window.history.pushState(null, '', '/');
       } catch (e) {
@@ -1082,44 +1278,71 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.log('[WebRTC Signaling] Successfully joined room:', payload);
         if (!isMounted) return;
 
+        if (payload.assignedRole && payload.assignedRole !== userRef.current.role) {
+          setUser((u) => {
+            const updated = { ...u, role: payload.assignedRole as UserRole };
+            userRef.current = updated;
+            return updated;
+          });
+        }
+
+        const myParticipantId = userRef.current.participantId || `part-${userRef.current.sessionId || userRef.current.id}`;
+
         if (payload.existingParticipants && payload.existingParticipants.length > 0) {
-          const peers: Participant[] = payload.existingParticipants.map((p) => ({
-            id: p.id,
-            name: p.name,
-            role: p.role || 'guest',
-            avatar: p.avatar,
-            audioEnabled: p.audioEnabled ?? true,
-            videoEnabled: p.videoEnabled ?? true,
-            isSpeaking: false,
-            audioLevel: 0,
-            isScreenSharing: p.isScreenSharing ?? false,
-            isHandRaised: p.isHandRaised ?? false,
-            isPinned: false,
-            isWaiting: false,
-            initials: p.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() || 'P',
-            connectionQuality: 'excellent',
-            stream: null,
-          }));
+          const peers: Participant[] = payload.existingParticipants
+            .filter((p) => p.id !== myParticipantId && p.participantId !== myParticipantId && p.id !== userRef.current.id)
+            .map((p) => {
+              const peerId = p.participantId || p.id;
+              return {
+                id: peerId,
+                participantId: peerId,
+                userId: p.userId,
+                sessionId: p.sessionId,
+                name: p.name,
+                role: p.role || 'guest',
+                avatar: p.avatar,
+                audioEnabled: p.audioEnabled ?? true,
+                videoEnabled: p.videoEnabled ?? true,
+                isSpeaking: false,
+                audioLevel: 0,
+                isScreenSharing: p.isScreenSharing ?? false,
+                isHandRaised: p.isHandRaised ?? false,
+                isPinned: false,
+                isWaiting: false,
+                initials: p.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() || 'P',
+                connectionQuality: 'excellent',
+                stream: null,
+              };
+            });
 
           setParticipants(peers);
 
           // As newly joined peer, initiate WebRTC offer to each existing peer
-          payload.existingParticipants.forEach((peer) => {
-            webRTCManager.createOfferToPeer(peer.id);
-          });
+          payload.existingParticipants
+            .filter((p) => p.id !== myParticipantId && p.participantId !== myParticipantId && p.id !== userRef.current.id)
+            .forEach((peer) => {
+              const targetId = peer.participantId || peer.id;
+              webRTCManager.createOfferToPeer(targetId);
+            });
         }
       },
       onUserJoined: (newUser) => {
         console.log('[WebRTC Signaling] New user joined:', newUser);
         if (!isMounted) return;
+        const myParticipantId = userRef.current.participantId || `part-${userRef.current.sessionId || userRef.current.id}`;
+        const newPeerId = newUser.participantId || newUser.id;
+        if (newPeerId === myParticipantId || newUser.id === userRef.current.id) return;
 
         setParticipants((prev) => {
-          if (prev.some((p) => p.id === newUser.id)) return prev;
+          if (prev.some((p) => (p.participantId || p.id) === newPeerId)) return prev;
           const initials = newUser.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase() || 'P';
           return [
             ...prev,
             {
-              id: newUser.id,
+              id: newPeerId,
+              participantId: newPeerId,
+              userId: newUser.userId,
+              sessionId: newUser.sessionId,
               name: newUser.name,
               role: newUser.role || 'guest',
               avatar: newUser.avatar,
@@ -1141,14 +1364,15 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       onUserLeft: ({ id, name }) => {
         console.log(`[WebRTC Signaling] Peer left: ${name} (${id})`);
         if (!isMounted) return;
-        setParticipants((prev) => prev.filter((p) => p.id !== id));
+        setParticipants((prev) => prev.filter((p) => p.id !== id && p.participantId !== id));
         webRTCManager.removePeer(id);
       },
       onMediaStateChanged: (payload) => {
         if (!isMounted) return;
+        const targetId = (payload as any).participantId || payload.peerId || (payload as any).id;
         setParticipants((prev) =>
           prev.map((p) => {
-            if (p.id !== payload.peerId) return p;
+            if (p.id !== targetId && p.participantId !== targetId) return p;
             return {
               ...p,
               ...(payload.audioEnabled !== undefined && { audioEnabled: payload.audioEnabled }),
@@ -1214,11 +1438,15 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // 4. Connect to signaling server and join room
     const currentUser = userRef.current;
+    const participantId = currentUser.participantId || `part-${currentUser.sessionId || currentUser.id}`;
     signalingClient.connect().then(() => {
       if (!isMounted) return;
       signalingClient.joinRoom({
         roomId: room.id,
-        peerId: currentUser.id,
+        participantId,
+        peerId: participantId,
+        userId: currentUser.id,
+        sessionId: currentUser.sessionId || participantId,
         name: currentUser.name,
         role: currentUser.role,
         avatar: currentUser.avatar,
@@ -1248,7 +1476,7 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [activeDrawer]);
 
   // Helper values
-  const isHost = user.role === 'host';
+  const isHost = Boolean(room && user.id === room.hostId) || user.role === 'host';
   const durationFormatted = formatDuration(durationSeconds);
   const shareableRoomUrl = room?.id ? `${window.location.origin}/join/${room.id}` : window.location.origin;
 
@@ -1336,11 +1564,15 @@ export const MeetingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         user,
         setUser,
         room,
+        roomNotFoundCode,
+        setRoomNotFoundCode,
+        isValidatingRoom,
         durationSeconds,
         durationFormatted,
         isHost,
         createInstantRoom,
         joinRoomById,
+        enterMeetingRoom,
         leaveRoom,
         audioEnabled,
         videoEnabled,

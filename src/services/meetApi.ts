@@ -1,10 +1,5 @@
 /**
- * Google Meet API Integration for ROOM by Armen GlobalWorks
- * Bridges ROOM conferences with Google Meet spaces
- */
-
-/**
- * Google Meet API Integration for ROOM by Armen GlobalWorks
+ * Google Meet API Integration for ROOM by Armen GlobalWorks (AGW)
  * Bridges ROOM conferences with Google Meet spaces using Firebase Auth & Google Meet REST API
  */
 

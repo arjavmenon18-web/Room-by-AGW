@@ -22,6 +22,7 @@ export const VideoTile: React.FC<VideoTileProps> = ({
   aspectClass = 'aspect-video',
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   // Bind video stream
   useEffect(() => {
@@ -38,6 +39,14 @@ export const VideoTile: React.FC<VideoTileProps> = ({
     }
   }, [isLocal, localStream, participant.stream, participant.videoEnabled]);
 
+  // Bind and play audio stream for remote participants even when camera is off
+  useEffect(() => {
+    if (audioRef.current && !isLocal && participant.stream) {
+      audioRef.current.srcObject = participant.stream;
+      audioRef.current.play().catch(() => {});
+    }
+  }, [isLocal, participant.stream]);
+
   const initials = participant.initials || participant.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
 
   return (
@@ -48,6 +57,11 @@ export const VideoTile: React.FC<VideoTileProps> = ({
           : 'border-[#262420] hover:border-[#3a3630]'
       }`}
     >
+      {/* Audio stream for remote participant */}
+      {!isLocal && participant.stream && (
+        <audio ref={audioRef} autoPlay playsInline className="hidden" />
+      )}
+
       {/* Video stream */}
       {participant.videoEnabled ? (
         isLocal ? (
